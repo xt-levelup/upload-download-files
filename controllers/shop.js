@@ -1,3 +1,6 @@
+const fs = require("fs");
+const path = require("path");
+
 const Product = require("../models/product");
 const Order = require("../models/order");
 
@@ -147,5 +150,55 @@ exports.getOrders = (req, res, next) => {
             const error = new Error(err);
             error.httpStatusCode = 500;
             return next(error);
+        });
+};
+
+exports.getInvoice = (req, res, next) => {
+    const orderId = req.params.orderId;
+
+    Order.findById(orderId)
+        .then((order) => {
+            if (!order) {
+                return next(new Error("No order found"));
+            }
+            if (order.user.userId.toString() !== req.user._id.toString()) {
+                return next(new Error("Unauthorizzed"));
+            }
+            const invoiceName = "invoice-" + orderId + ".pdf";
+            const invoicePath = path.join("data", "invoices", invoiceName);
+
+            // ---Dành cho file nhỏ-------------------------------------
+
+            // fs.readFile(invoicePath, (err, data) => {
+            //     if (err) {
+            //         return next(err);
+            //     }
+            //     res.setHeader("Content-Type", "application/pdf");
+            //     res.setHeader(
+            //         "Content-Disposition",
+            //         "inline;filename='" + invoiceName + "'"
+            //     );
+            //     // res.setHeader(
+            //     //     "Content-Disposition",
+            //     //     "attachment;filename='" + invoiceName + "'"
+            //     // );
+            //     res.send(data);
+            // });
+
+            //-----------------------------------------------------------
+
+            //-----Dành cho file lớn (streaming file)--------------------
+
+            const file = fs.createReadStream(invoicePath);
+            res.setHeader("Content-Type", "application/pdf");
+            res.setHeader(
+                "Content-Disposition",
+                "inline;filename='" + invoiceName + "'"
+            );
+            file.pipe(res);
+            //-----------------------------------------------------------
+        })
+        .catch((err) => {
+            return next(err);
         });
 };
